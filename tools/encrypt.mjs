@@ -78,7 +78,11 @@ button:disabled{opacity:.6;cursor:wait}
       .then(function(k){ return crypto.subtle.decrypt({name:'AES-GCM', iv:dec(P.iv)}, k, dec(P.ct)); })
       .then(function(buf){ return new TextDecoder().decode(buf); });
   }
-  function show(html){ document.open(); document.write(html); document.close(); }
+  // 頁面還在載入時呼叫 document.open() 不會清掉舊內容，必須等 load 之後再換頁
+  function show(html){
+    function swap(){ document.open(); document.write(html); document.close(); }
+    if(document.readyState === 'complete') swap(); else window.addEventListener('load', swap, {once:true});
+  }
   function derive(pw){
     return crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits'])
       .then(function(b){ return crypto.subtle.deriveBits({name:'PBKDF2', salt:dec(P.salt), iterations:P.iter, hash:'SHA-256'}, b, 256); });
@@ -86,7 +90,13 @@ button:disabled{opacity:.6;cursor:wait}
   if(!window.crypto || !crypto.subtle){ msg.textContent = '此瀏覽器不支援，請改用 https 網址開啟'; btn.disabled = true; return; }
   var saved = null;
   try{ saved = localStorage.getItem(KEY); }catch(e){}
-  if(saved){ open(dec(saved)).then(show).catch(function(){ try{ localStorage.removeItem(KEY); }catch(e){} }); }
+  if(saved){
+    f.style.visibility = 'hidden';
+    open(dec(saved)).then(show).catch(function(){
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      f.style.visibility = '';
+    });
+  }
   f.addEventListener('submit', function(e){
     e.preventDefault();
     btn.disabled = true; msg.textContent = '解鎖中…';
